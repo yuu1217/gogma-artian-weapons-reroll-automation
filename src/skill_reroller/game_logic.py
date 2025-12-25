@@ -23,9 +23,11 @@ from .input_manager import InputManager
 
 
 class GameLogic:
-    def __init__(self, max_attempts: int = MAX_ATTEMPTS):
+    def __init__(self, max_attempts: int = MAX_ATTEMPTS, timestamp: str = None):
         self.logger = logging.getLogger(__name__)
-        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        # タイムスタンプが指定されていない場合は新規生成
+        if timestamp is None:
+            timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
         self.session_dir = os.path.join(OUTPUT_DIR, timestamp)
         os.makedirs(self.session_dir, exist_ok=True)
         self.logger.info(f"Session directory created: {self.session_dir}")
