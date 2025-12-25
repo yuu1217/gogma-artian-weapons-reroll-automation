@@ -1,8 +1,10 @@
 import pydirectinput
 import time
 import logging
-import pygetwindow as gw
+import ctypes
+
 from .config import KEYBINDS, DELAYS, WINDOW_TITLE
+
 
 pydirectinput.FAILSAFE = True
 
@@ -13,19 +15,26 @@ class InputManager:
 
     def focus_window(self):
         try:
-            windows = gw.getWindowsWithTitle(WINDOW_TITLE)
-            if windows:
-                win = windows[0]
-                if not win.isActive:
-                    self.logger.info(f"Activating window: {WINDOW_TITLE}")
-                    win.activate()
-                    time.sleep(1.0)
+            hwnd = ctypes.windll.user32.FindWindowW(None, WINDOW_TITLE)
+
+            if hwnd:
+                self.logger.info(f"Activating window: {WINDOW_TITLE} (HWND: {hwnd})")
+                self._force_focus(hwnd)
             else:
                 self.logger.warning(
                     f"Window '{WINDOW_TITLE}' not found. Please activate it manually."
                 )
+
         except Exception as e:
-            self.logger.error(f"Failed to activate window: {e}")
+            self.logger.error(f"Failed to activate window logic: {e}")
+
+    def _force_focus(self, hwnd):
+        """Altキーの空打ちハックを使用してWindowsのフォアグラウンドロックを回避する"""
+        self.logger.info("Simulating ALT key press to bypass foreground lock...")
+        pydirectinput.press("alt")
+        time.sleep(0.1)
+        ctypes.windll.user32.SetForegroundWindow(hwnd)
+        time.sleep(1.0)
 
     def _press(self, key: str, delay: float = DELAYS["AFTER_CLICK"]):
         try:

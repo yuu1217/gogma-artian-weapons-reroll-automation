@@ -1,4 +1,3 @@
-from .game_logic import GameLogic
-from .config import MAX_ATTEMPTS
+from .gui import create_app
 
-__all__ = ["GameLogic", "MAX_ATTEMPTS"]
+__all__ = ["create_app"]
