@@ -1,0 +1,44 @@
+[game]
+window_title = "Monster Hunter Wilds"
+
+[ocr]
+lang = "japan"
+
+[coordinates]
+auto_select_btn = [248, 1417]
+reroll_btn = [460, 773]
+skill_area = [2150, 710, 2560, 800]
+back_btn = [40, 1419]
+material_rows = [[680, 340, 920, 390], [680, 460, 920, 510], [680, 580, 920, 630]]
+weapon_name = [1620, 252, 2020, 303]
+weapon_element = [1790, 560, 2030, 600]
+
+[keybinds]
+auto_select_key = "g"
+confirm_key = "space"
+cancel_key = "esc"
+up_key = "up"
+down_key = "down"
+menu_key = "esc"
+tab_left_key = "q"
+stop_key = "alt+q"
+
+[delays]
+after_click = 0.15
+reroll_animation = 5.0
+return_to_title = 0.3
+
+[output]
+dir = "data/output/skill_reroller"
+report_name = "report"
+
+[reroll]
+max_attempts = 0
+match_threshold = 0.65
+stop_on_match = false
+return_to_title = true
+target_combinations = [["巨戟龍の黙示録", "ヌシの魂",], ["黒蝕竜の力", "ヌシの魂",]]
+
+[skills]
+series = ["闢獣の力", "火竜の力", "兇爪竜の力", "鎖刃竜の命脈", "波衣竜の守護", "煌雷竜の力", "雷顎竜の闘志", "雪獅子の闘志", "鎧竜の守護", "凍峰竜の反逆", "暗器蛸の力", "獄焔蛸の反逆", "黒蝕竜の力", "鎖刃竜の飢餓", "泡狐竜の力", "白熾龍の脈動", "千刃竜の闘志", "海竜の渦雷", "暗黒騎士の証", "オメガレゾナンス", "巨戟龍の黙示録"]
+group = ["鱗張りの技法", "革細工の柔性", "毛皮の昂揚", "甲虫の知らせ", "護竜の脈動", "ヌシの誇り", "甲虫の擬態", "革細工の滑性", "鱗重ねの工夫", "毛皮の誘惑", "護竜の守り", "ヌシの憤激", "先達の導き", "ヌシの魂"]
