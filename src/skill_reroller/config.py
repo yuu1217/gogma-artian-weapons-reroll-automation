@@ -47,8 +47,8 @@ OUTPUT_DIR = os.path.join("data", "output", "skill_reroller")
 if not os.path.exists(OUTPUT_DIR):
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# 最大試行回数 (0は素材数から自動計算)
-MAX_ATTEMPTS = 0
+# 最大試行回数 (0は素材を全て使い切るまで繰り返す)
+MAX_ATTEMPTS = 1
 
 WINDOW_TITLE = "Monster Hunter Wilds"
 
