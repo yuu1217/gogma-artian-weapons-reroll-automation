@@ -1,56 +1,60 @@
-import os
+import tomllib
+from pathlib import Path
 
-OCR_LANG = "japan"
+# 設定ファイルパス
+CONFIG_FILE = Path(__file__).parent / "config.toml"
 
-# 座標定義 (解像度2560x1440基準)
+# 設定を読み込み
+with open(CONFIG_FILE, "rb") as f:
+    _config = tomllib.load(f)
+
+# ゲーム設定
+WINDOW_TITLE = _config["game"]["window_title"]
+
+# OCR設定
+OCR_LANG = _config["ocr"]["lang"]
+
+# 座標設定
 COORDINATES = {
-    "AUTO_SELECT_BTN": (248, 1417),
-    "REROLL_BTN": (460, 773),
-    # スキル表示エリア
-    "SKILL_AREA": (2150, 710, 2560, 800),
-    "BACK_BTN": (40, 1419),
-    # 素材数読み取りエリア
-    "MATERIAL_ROWS": [
-        (680, 340, 920, 390),
-        (680, 460, 920, 510),
-        (680, 580, 920, 630),
-    ],
+    "AUTO_SELECT_BTN": tuple(_config["coordinates"]["auto_select_btn"]),
+    "REROLL_BTN": tuple(_config["coordinates"]["reroll_btn"]),
+    "SKILL_AREA": tuple(_config["coordinates"]["skill_area"]),
+    "BACK_BTN": tuple(_config["coordinates"]["back_btn"]),
+    "MATERIAL_ROWS": [tuple(row) for row in _config["coordinates"]["material_rows"]],
+    "WEAPON_NAME": tuple(_config["coordinates"]["weapon_name"]),
+    "WEAPON_ELEMENT": tuple(_config["coordinates"]["weapon_element"]),
 }
 
+# キーバインド設定
 KEYBINDS = {
-    "AUTO_SELECT": "g",
-    "CONFIRM": "space",
-    "CANCEL": "esc",
-    "UP": "up",
-    "DOWN": "down",
-    "MENU": "esc",
-    "TAB_LEFT": "q",
+    "AUTO_SELECT": _config["keybinds"]["auto_select_key"],
+    "CONFIRM": _config["keybinds"]["confirm_key"],
+    "CANCEL": _config["keybinds"]["cancel_key"],
+    "UP": _config["keybinds"]["up_key"],
+    "DOWN": _config["keybinds"]["down_key"],
+    "MENU": _config["keybinds"]["menu_key"],
+    "TAB_LEFT": _config["keybinds"]["tab_left_key"],
 }
+STOP_KEY = _config["keybinds"]["stop_key"]
 
+# 遅延設定
 DELAYS = {
-    # 基本操作の待機時間
-    "AFTER_CLICK": 0.15,
-    "REROLL_ANIMATION": 5.0,
-    # タイトルに戻る操作は一度しか行われないので安全性重視で長めの遅延を設ける
-    "RETURN_TO_TITLE": 0.3,
+    "AFTER_CLICK": _config["delays"]["after_click"],
+    "REROLL_ANIMATION": _config["delays"]["reroll_animation"],
+    "RETURN_TO_TITLE": _config["delays"]["return_to_title"],
 }
 
-# ターゲットスキルの組み合わせ
-TARGET_COMBINATIONS = [["闘獣の力", "甲虫の知らせ"]]
+# 出力設定
+OUTPUT_DIR = _config["output"]["dir"]
+REPORT_NAME = _config["output"]["report_name"]
 
-# 近似一致の閾値
-MATCH_THRESHOLD = 0.65
+# リロール設定
+MAX_ATTEMPTS = _config["reroll"]["max_attempts"]
+MATCH_THRESHOLD = _config["reroll"]["match_threshold"]
+STOP_ON_MATCH = _config["reroll"]["stop_on_match"]
+RETURN_TO_TITLE = _config["reroll"]["return_to_title"]
+TARGET_COMBINATIONS = _config["reroll"]["target_combinations"]
 
-REPORT_NAME = "report"
-
-OUTPUT_DIR = os.path.join("data", "output", "skill_reroller")
-if not os.path.exists(OUTPUT_DIR):
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-
-# 最大試行回数 (0は素材を全て使い切るまで繰り返す)
-MAX_ATTEMPTS = 1
-
-WINDOW_TITLE = "Monster Hunter Wilds"
-
-# 中断キー
-STOP_KEY = "alt+q"
+# スキル一覧
+SERIES_SKILLS = _config["skills"]["series"]
+GROUP_SKILLS = _config["skills"]["group"]

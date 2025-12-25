@@ -1,9 +1,9 @@
 import time
 import logging
 import cv2
-import os
 import re
 import keyboard
+from pathlib import Path
 from datetime import datetime
 from difflib import SequenceMatcher
 from .config import (
@@ -11,7 +11,6 @@ from .config import (
     DELAYS,
     OUTPUT_DIR,
     TARGET_COMBINATIONS,
-    MATCH_THRESHOLD,
     MATCH_THRESHOLD,
     MAX_ATTEMPTS,
     STOP_KEY,
@@ -23,34 +22,53 @@ from .input_manager import InputManager
 
 
 class GameLogic:
-    def __init__(self, max_attempts: int = MAX_ATTEMPTS, timestamp: str = None):
+    def __init__(
+        self,
+        max_attempts: int = MAX_ATTEMPTS,
+        timestamp: str = None,
+        target_combination: list = None,
+        stop_on_match: bool = True,
+        return_to_title: bool = True,
+    ):
         self.logger = logging.getLogger(__name__)
-        # タイムスタンプが指定されていない場合は新規生成
         if timestamp is None:
             timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-        self.session_dir = os.path.join(OUTPUT_DIR, timestamp)
-        os.makedirs(self.session_dir, exist_ok=True)
+        self.session_dir = Path(OUTPUT_DIR) / timestamp
+        self.session_dir.mkdir(parents=True, exist_ok=True)
         self.logger.info(f"Session directory created: {self.session_dir}")
+
+        # セッション開始時刻を保存（レポート用）
+        self.session_timestamp = timestamp
 
         self.initial_materials = []
         self.history = []
         self.total_points_start = 0
+        self.weapon_name = "Unknown"
+        self.weapon_element = "Unknown"
 
         self.max_attempts = max_attempts
         self.current_attempt = 0
         self.stop_requested = False
+
+        self.stop_on_match = stop_on_match
+        self.return_to_title_enabled = return_to_title
+
+        # ターゲット組み合わせの設定
+        if target_combination:
+            self.target_combinations = target_combination
+        else:
+            self.target_combinations = TARGET_COMBINATIONS
 
         self.ocr = OCRHandler()
         self.screen_reader = ScreenReader()
         self.input_manager = InputManager()
 
         self.logger.info(
-            f"GameLogic initialized. Fallback max attempts: {max_attempts}"
+            f"GameLogic initialized. Fallback max attempts: {max_attempts}, StopOnMatch: {stop_on_match}, Return: {return_to_title}"
         )
 
     def run(self):
         self.input_manager.focus_window()
-        # 素材数から実行可能回数を計算
         available_attempts = self._calculate_available_attempts()
 
         if self.max_attempts == 0:
@@ -64,8 +82,9 @@ class GameLogic:
             )
             if self.max_attempts > available_attempts:
                 self.logger.warning(
-                    f"Warning: Configured attempts ({self.max_attempts}) exceeds available materials ({available_attempts})."
+                    f"Warning: Configured attempts ({self.max_attempts}) exceeds available materials ({available_attempts}). Capping to {available_attempts}."
                 )
+                self.max_attempts = available_attempts
 
         self.logger.info(
             f"Starting reroll loop. Press '{STOP_KEY}' to stop gracefully."
@@ -106,29 +125,47 @@ class GameLogic:
                     }
                 )
 
-                if TARGET_COMBINATIONS:
+                if self.target_combinations:
                     if is_target:
                         self.logger.info("!!! TARGET COMBINATION FOUND !!!")
                         # ターゲット検出時は接頭辞なしで保存
                         self._save_screenshot(skills, prefix="")
-                        self.logger.info(f"Target found: {skills}. Continuing...")
+                        self.logger.info(f"Target found: {skills}.")
+
+                        if self.stop_on_match:
+                            self.logger.info(
+                                "Stop on Match enabled. Stopping at confirmation screen."
+                            )
+                            break
+                        else:
+                            self.logger.info("Stop on Match disabled. Continuing...")
+                            # 次の試行へ
+                            self.logger.info("Discarding result and continuing...")
+                            self.input_manager.select_no_and_confirm()
                     else:
                         self.logger.info("Target not matched. Continuing...")
+                        # 次の試行へ
+                        self.logger.info("Discarding result and continuing...")
+                        self.input_manager.select_no_and_confirm()
                 else:
                     if skills:
                         self._save_screenshot(skills)
-
-                # 次の試行へ (いいえを選択)
-                self.logger.info("Discarding result and continuing...")
-                self.input_manager.select_no_and_confirm()
+                    # 次の試行へ
+                    self.logger.info("Discarding result and continuing...")
+                    self.input_manager.select_no_and_confirm()
 
             self.logger.info("Loop finished.")
 
             if not self.stop_requested:
-                self.logger.info(
-                    "Attempts exhausted. execution return_to_title sequence."
-                )
-                self.input_manager.return_to_title()
+                if self.return_to_title_enabled:
+                    self.logger.info(
+                        "Attempts exhausted or target found. Executing return_to_title sequence."
+                    )
+                    self.input_manager.return_to_title()
+                else:
+                    self.logger.info(
+                        "Return to title disabled. Staying on current screen."
+                    )
             else:
                 self.logger.info("Process interrupted. Skipping return_to_title.")
 
@@ -159,6 +196,9 @@ class GameLogic:
     def _calculate_available_attempts(self) -> int:
         self.logger.info("Calculating available attempts from materials...")
         full_img = self.screen_reader.capture_screen()
+
+        # Extract weapon info using the same screenshot
+        self._extract_weapon_info(full_img)
 
         total_points = 0
         self.initial_materials = []
@@ -200,8 +240,77 @@ class GameLogic:
             self.total_points_start = total_points
             return calc
         else:
-            self.logger.error("Failed to calculate points.")
-            raise RuntimeError("Could not calculate max attempts from screen.")
+            self.logger.error("Failed to calculate points using OCR.")
+            # デバッグ用画像を保存
+            try:
+                debug_path = self.session_dir / "debug_failed_calc.jpg"
+                cv2.imwrite(str(debug_path), full_img)
+                self.logger.error(
+                    f"Saved debug screenshot to {debug_path} for investigation."
+                )
+            except Exception as e:
+                self.logger.error(f"Failed to save debug screenshot: {e}")
+
+            raise RuntimeError(
+                "Could not calculate max attempts from screen. Check debug image."
+            )
+
+    def _extract_weapon_info(self, full_img):
+        """Extract weapon name and element from the full screen image."""
+        try:
+            # Weapon Name
+            nx1, ny1, nx2, ny2 = COORDINATES["WEAPON_NAME"]
+            name_img = full_img[ny1:ny2, nx1:nx2]
+            name_texts = self.ocr.extract_text(name_img)
+            if name_texts:
+                self.weapon_name = name_texts[0].strip()
+
+            # Weapon Element
+            ex1, ey1, ex2, ey2 = COORDINATES["WEAPON_ELEMENT"]
+            elem_img = full_img[ey1:ey2, ex1:ex2]
+            elem_texts = self.ocr.extract_text(elem_img)
+
+            # OCRが何も検出しなかった、または空のリストの場合
+            if not elem_texts:
+                self.weapon_element = "無"
+            else:
+                raw_elem = elem_texts[0].strip()
+                # 属性タイプを除去
+                clean_elem = raw_elem.replace("属性タイプ", "").strip()
+
+                # 空文字列またはスペースのみの場合
+                if not clean_elem:
+                    self.weapon_element = "無"
+                else:
+                    # 有効な属性リスト
+                    valid_elements = [
+                        "火",
+                        "水",
+                        "雷",
+                        "氷",
+                        "龍",
+                        "麻痺",
+                        "毒",
+                        "爆破",
+                        "無",
+                    ]
+
+                    # マッチする属性を探す
+                    matched = None
+                    for elem in valid_elements:
+                        if elem in clean_elem:
+                            matched = elem
+                            break
+
+                    if matched:
+                        self.weapon_element = matched
+                    else:
+                        self.weapon_element = "正常に認識できませんでした"
+
+            self.logger.info(f"Weapon Info: {self.weapon_name} ({self.weapon_element})")
+
+        except Exception as e:
+            self.logger.error(f"Failed to extract weapon info: {e}")
 
     def _perform_reroll_action(self):
         self.input_manager.click_auto_select()
@@ -215,10 +324,10 @@ class GameLogic:
         return valid_skills
 
     def _check_combination_target(self, detected_skills: list[str]) -> bool:
-        if not TARGET_COMBINATIONS:
+        if not self.target_combinations:
             return False
 
-        for combination in TARGET_COMBINATIONS:
+        for combination in self.target_combinations:
             all_match_in_combo = True
             for target_skill in combination:
                 found_this_skill = False
@@ -254,7 +363,6 @@ class GameLogic:
                 return True
         return False
 
-    # 結果のスクリーンショットを保存
     def _save_screenshot(self, skills: list[str], prefix: str = ""):
         safe_skills = (
             "+".join(skills).replace("/", " ").replace("\\", " ").replace(":", " ")
@@ -263,7 +371,7 @@ class GameLogic:
             safe_skills = safe_skills[:50] + "..."
 
         filename = f"{prefix}{self.current_attempt}回目 {safe_skills}.jpg"
-        filepath = os.path.join(self.session_dir, filename)
+        filepath = self.session_dir / filename
 
         full_img = self.screen_reader.capture_screen()
 
@@ -284,25 +392,24 @@ class GameLogic:
         self._generate_report()
 
     def _generate_report(self):
-        report_path = os.path.join(self.session_dir, f"{REPORT_NAME}.md")
+        report_path = self.session_dir / f"{REPORT_NAME}.md"
         try:
             with open(report_path, "w", encoding="utf-8") as f:
                 f.write(f"# {REPORT_NAME}\n\n")
-                f.write(
-                    f"- **実行日時**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-                )
+                f.write(f"- **実行日時**: {self.session_timestamp}\n")
+                f.write(f"- **武器名**: {self.weapon_name}\n")
+                f.write(f"- **属性**: {self.weapon_element}\n")
                 f.write(f"- **開始時ポイント合計**: {self.total_points_start}\n")
-                f.write(f"- **最大試行回数**: {self.max_attempts}\n")
-                f.write(f"- **中断キー**: {STOP_KEY}\n")
+                f.write(f"- **スキル再付与を行った回数**: {self.current_attempt}\n")
                 f.write(f"- **ターゲットの組み合わせ**:\n")
-                if TARGET_COMBINATIONS:
-                    for combo in TARGET_COMBINATIONS:
+                if self.target_combinations:
+                    for combo in self.target_combinations:
                         f.write(f"  - {combo}\n")
                 else:
                     f.write("  - (なし)\n")
                 f.write("\n")
 
-                f.write("## 開始時の素材状況\n\n")
+                f.write("## 素材の状況\n\n")
                 f.write("| 行 | 単価 | 所持数 | 小計 |\n")
                 f.write("| :--- | :--- | :--- | :--- |\n")
                 for mat in self.initial_materials:
@@ -313,7 +420,7 @@ class GameLogic:
                     f.write("| - | - | - | - |\n")
                 f.write("\n")
 
-                f.write("## リロール履歴\n\n")
+                f.write("## 厳選履歴\n\n")
                 f.write("| 回数 | 時刻 | 検出スキル | ターゲット一致 |\n")
                 f.write("| :--- | :--- | :--- | :--- |\n")
                 for entry in self.history:
