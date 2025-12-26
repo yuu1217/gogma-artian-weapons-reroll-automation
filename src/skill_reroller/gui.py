@@ -599,51 +599,70 @@ def create_app(page: ft.Page):
                 w_e = m["weapon_element"]
                 combo = m["matched_combo"]
                 detected = m.get("raw_skills", "")
+                is_exact_match = m.get("is_exact_match", True)
 
                 # コンボ表示用
                 combo_str = " + ".join([c for c in combo if c])
 
-                card = ft.Card(
-                    content=ft.Container(
-                        content=ft.Column(
-                            [
-                                ft.Row(
-                                    [
-                                        ft.Text(
-                                            f"{count}回目",
-                                            size=20,
-                                            weight=ft.FontWeight.BOLD,
-                                            color=ft.Colors.AMBER,
-                                        ),
-                                        ft.Container(
-                                            content=ft.Text(
-                                                w_e,
-                                                size=14,
-                                                weight=ft.FontWeight.BOLD,
-                                                color=ft.Colors.ON_PRIMARY_CONTAINER,
-                                            ),
-                                            bgcolor=ft.Colors.PRIMARY_CONTAINER,
-                                            padding=ft.padding.symmetric(
-                                                horizontal=10, vertical=5
-                                            ),
-                                            border_radius=5,
-                                        ),
-                                    ],
-                                    alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-                                ),
-                                ft.Divider(height=10, color="transparent"),
-                                ft.Text(
-                                    f"ターゲット: {combo_str}",
+                # タイトル行の要素を作成
+                title_row_controls = [
+                    ft.Text(
+                        f"{count}回目",
+                        size=20,
+                        weight=ft.FontWeight.BOLD,
+                        color=ft.Colors.AMBER,
+                    ),
+                ]
+
+                if not is_exact_match:
+                    title_row_controls.append(
+                        ft.Text(
+                            "誤検出の可能性あり",
+                            size=12,
+                            color=ft.Colors.RED_400,
+                            weight=ft.FontWeight.BOLD,
+                        )
+                    )
+
+                # カードコンテンツ
+                card_controls = [
+                    ft.Row(
+                        [
+                            ft.Row(
+                                title_row_controls,
+                                spacing=10,
+                                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                            ),
+                            ft.Container(
+                                content=ft.Text(
+                                    w_e,
                                     size=14,
                                     weight=ft.FontWeight.BOLD,
+                                    color=ft.Colors.ON_PRIMARY_CONTAINER,
                                 ),
-                                ft.Text(
-                                    f"検出結果: {detected}",
-                                    size=12,
-                                    color=ft.Colors.GREY_500,
-                                ),
-                            ]
-                        ),
+                                bgcolor=ft.Colors.PRIMARY_CONTAINER,
+                                padding=ft.padding.symmetric(horizontal=10, vertical=5),
+                                border_radius=5,
+                            ),
+                        ],
+                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                    ),
+                    ft.Divider(height=10, color="transparent"),
+                    ft.Text(
+                        f"ターゲット: {combo_str}",
+                        size=14,
+                        weight=ft.FontWeight.BOLD,
+                    ),
+                    ft.Text(
+                        f"検出結果: {detected}",
+                        size=12,
+                        color=ft.Colors.GREY_500,
+                    ),
+                ]
+
+                card = ft.Card(
+                    content=ft.Container(
+                        content=ft.Column(card_controls),
                         padding=15,
                     ),
                     margin=ft.margin.only(bottom=10),

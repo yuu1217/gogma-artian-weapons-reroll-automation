@@ -157,15 +157,24 @@ class TableManager:
                 for combination in targets:
                     # 順不同マッチング
                     all_matched = True
+                    all_exact_match = True
+
                     for target_skill in combination:
                         found_this_skill = False
+                        found_exact_skill = False
+
                         for detected in detected_skills:
                             if is_fuzzy_match(target_skill, detected, threshold):
                                 found_this_skill = True
+                                if target_skill in detected:
+                                    found_exact_skill = True
                                 break
                         if not found_this_skill:
                             all_matched = False
                             break
+
+                        if not found_exact_skill:
+                            all_exact_match = False
 
                     if all_matched:
                         results.append(
@@ -174,6 +183,7 @@ class TableManager:
                                 "weapon_element": weapon_element,
                                 "matched_combo": combination,
                                 "raw_skills": skills_str,
+                                "is_exact_match": all_exact_match,
                             }
                         )
                         break

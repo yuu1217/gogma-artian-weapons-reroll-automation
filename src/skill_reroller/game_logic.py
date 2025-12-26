@@ -132,7 +132,7 @@ class GameLogic:
                 self.logger.info(f"Detected skills: {skills}")
 
                 # ターゲット判定
-                is_target = self._check_combination_target(skills)
+                is_target, is_exact_match = self._check_combination_target(skills)
 
                 self.history.append(
                     {
@@ -146,7 +146,9 @@ class GameLogic:
                 if self.target_combinations:
                     if is_target:
                         self.logger.info("!!! TARGET COMBINATION FOUND !!!")
-                        self._save_screenshot(skills, prefix="")
+                        self._save_screenshot(
+                            skills, prefix="", exact_match=is_exact_match
+                        )
                         self.logger.info(f"Target found: {skills}.")
 
                         if self.stop_on_match:
@@ -278,27 +280,39 @@ class GameLogic:
         valid_skills = [s.strip() for s in skills if s.strip()]
         return valid_skills
 
-    def _check_combination_target(self, detected_skills: list[str]) -> bool:
+    def _check_combination_target(
+        self, detected_skills: list[str]
+    ) -> tuple[bool, bool]:
         if not self.target_combinations:
-            return False
+            return False, False
 
         for combination in self.target_combinations:
             all_match_in_combo = True
+            all_exact_match = True
+
             for target_skill in combination:
                 found_this_skill = False
+                found_exact_skill = False
+
                 for detected in detected_skills:
                     if self._is_fuzzy_match(target_skill, detected):
                         found_this_skill = True
+                        if target_skill in detected:
+                            found_exact_skill = True
                         break
+
                 if not found_this_skill:
                     all_match_in_combo = False
                     break
 
+                if not found_exact_skill:
+                    all_exact_match = False
+
             if all_match_in_combo:
                 self.logger.info(f"Combination Matched: {combination}")
-                return True
+                return True, all_exact_match
 
-        return False
+        return False, False
 
     def _is_fuzzy_match(self, target: str, skill: str) -> bool:
         if target in skill:
@@ -318,14 +332,17 @@ class GameLogic:
                 return True
         return False
 
-    def _save_screenshot(self, skills: list[str], prefix: str = ""):
+    def _save_screenshot(
+        self, skills: list[str], prefix: str = "", exact_match: bool = True
+    ):
         safe_skills = (
-            "+".join(skills).replace("/", " ").replace("\\", " ").replace(":", " ")
+            "+".join(skills).replace("/", "_").replace("\\", "_").replace(":", "_")
         )
         if len(safe_skills) > 50:
             safe_skills = safe_skills[:50] + "..."
 
-        filename = f"{prefix}{self.current_attempt}回目 {safe_skills}.jpg"
+        suffix = "" if exact_match else " (誤検出の可能性あり)"
+        filename = f"{prefix}{self.current_attempt}回目 {safe_skills}{suffix}.jpg"
         filepath = self.session_dir / filename
 
         full_img = self.screen_reader.capture_screen()
