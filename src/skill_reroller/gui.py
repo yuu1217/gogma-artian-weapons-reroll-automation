@@ -50,7 +50,7 @@ def create_app(page: ft.Page):
     page.window.min_width = 720
     page.window.min_height = 320
     page.window.max_width = 960
-    page.window.max_height = 960
+    page.window.max_height = 2160
 
     table_manager = TableManager()  # TableManagerの初期化
 
