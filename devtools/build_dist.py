@@ -157,9 +157,7 @@ def create_zip():
     zip_path = PROJECT_ROOT / zip_filename
     print(f"Creating ZIP archive: {zip_path}")
 
-    shutil.make_archive(
-        str(PROJECT_ROOT / OUTPUT_ZIP_NAME), "zip", PROJECT_ROOT, "dist"
-    )
+    shutil.make_archive(str(PROJECT_ROOT / OUTPUT_ZIP_NAME), "zip", DIST_DIR)
     print(f"Done! Distribution created at: {zip_path}")
 
 
