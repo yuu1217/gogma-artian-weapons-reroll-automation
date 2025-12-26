@@ -10,7 +10,7 @@ UV_VERSION = "latest"  # or specific version like "0.5.11"
 UV_PLATFORM = "x86_64-pc-windows-msvc"
 PROJECT_ROOT = pathlib.Path(__file__).parent.parent
 DIST_DIR = PROJECT_ROOT / "dist"
-OUTPUT_ZIP_NAME = "gogma_reroll_automation"
+OUTPUT_ZIP_NAME = "gogma-artian-weapons-reroll-automation"
 
 
 def clean_dist():
