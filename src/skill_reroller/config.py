@@ -47,13 +47,21 @@ DELAYS = {
 # 出力設定
 OUTPUT_DIR = _config["output"]["dir"]
 REPORT_NAME = _config["output"]["report_name"]
+TABLE_FILE_NAME = _config["output"]["table_file_name"]
 
 # リロール設定
 MAX_ATTEMPTS = _config["reroll"]["max_attempts"]
 MATCH_THRESHOLD = _config["reroll"]["match_threshold"]
 STOP_ON_MATCH = _config["reroll"]["stop_on_match"]
 RETURN_TO_TITLE = _config["reroll"]["return_to_title"]
+CURRENT_CONFIRMED_COUNT = _config["reroll"]["current_confirmed_count"]
 TARGET_COMBINATIONS = _config["reroll"]["target_combinations"]
+
+# 選択肢設定
+WEAPONS = _config["selection"]["weapons"]
+ELEMENTS = _config["selection"]["elements"]
+LAST_WEAPON = _config["selection"].get("last_weapon", WEAPONS[0] if WEAPONS else "")
+LAST_ELEMENT = _config["selection"].get("last_element", ELEMENTS[0] if ELEMENTS else "")
 
 # スキル一覧
 SERIES_SKILLS = _config["skills"]["series"]
