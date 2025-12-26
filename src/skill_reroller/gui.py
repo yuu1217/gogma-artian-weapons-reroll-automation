@@ -3,6 +3,7 @@ import threading
 import logging
 import sys
 import toml
+import os
 from pathlib import Path
 from datetime import datetime
 from .config import (
@@ -12,8 +13,15 @@ from .config import (
     MAX_ATTEMPTS,
     STOP_ON_MATCH,
     RETURN_TO_TITLE,
+    WEAPONS,
+    ELEMENTS,
+    LAST_WEAPON,
+    LAST_ELEMENT,
+    CURRENT_CONFIRMED_COUNT,
+    MATCH_THRESHOLD,
 )
 from .game_logic import GameLogic
+from .table_manager import TableManager  # インポート追加
 
 
 def setup_logging(timestamp: str):
@@ -32,13 +40,19 @@ def setup_logging(timestamp: str):
 
 def create_app(page: ft.Page):
     page.title = "巨戟アーティア武器スキル厳選自動化ツール"
+    page.theme_mode = ft.ThemeMode.DARK
+    page.theme = ft.Theme(color_scheme_seed=ft.Colors.AMBER)
+    page.padding = 20
+
+    # ウィンドウサイズ設定
     page.window.width = 720
     page.window.height = 960
     page.window.min_width = 720
     page.window.min_height = 320
-    page.theme_mode = ft.ThemeMode.DARK
-    page.theme = ft.Theme(color_scheme_seed=ft.Colors.AMBER)
-    page.padding = 20
+    page.window.max_width = 960
+    page.window.max_height = 960
+
+    table_manager = TableManager()  # TableManagerの初期化
 
     def get_directory_result(e):
         if e.path:
@@ -55,7 +69,6 @@ def create_app(page: ft.Page):
         read_only=False,
         expand=True,
         border_color=ft.Colors.GREY_500,
-        label_style=ft.TextStyle(color=ft.Colors.GREY_500),
     )
 
     folder_picker_button = ft.IconButton(
@@ -65,6 +78,70 @@ def create_app(page: ft.Page):
 
     path_row = ft.Row(
         [output_path, folder_picker_button],
+        alignment=ft.MainAxisAlignment.CENTER,
+    )
+
+    # --- 武器選択セクション ---
+    weapon_dropdown = ft.Dropdown(
+        label="武器種",
+        options=[ft.dropdown.Option(w) for w in WEAPONS],
+        value=(
+            LAST_WEAPON if LAST_WEAPON in WEAPONS else (WEAPONS[0] if WEAPONS else None)
+        ),
+        expand=True,
+        border_color=ft.Colors.GREY_500,
+    )
+
+    element_dropdown = ft.Dropdown(
+        label="属性",
+        options=[ft.dropdown.Option(e) for e in ELEMENTS],
+        value=(
+            LAST_ELEMENT
+            if LAST_ELEMENT in ELEMENTS
+            else (ELEMENTS[0] if ELEMENTS else None)
+        ),
+        expand=True,
+        border_color=ft.Colors.GREY_500,
+    )
+
+    confirmed_count_input = ft.TextField(
+        label="確定済み回数",
+        value=str(CURRENT_CONFIRMED_COUNT),
+        expand=True,
+        keyboard_type=ft.KeyboardType.NUMBER,
+        input_filter=ft.InputFilter(
+            allow=True, regex_string=r"^\d*$", replacement_string=""
+        ),
+        text_align=ft.TextAlign.RIGHT,
+        border_color=ft.Colors.GREY_500,
+    )
+
+    reload_table_button = ft.IconButton(
+        icon=ft.Icons.REFRESH,
+        tooltip="厳選表を再読み込み",
+        on_click=lambda e: reload_table_action(e),
+    )
+
+    def reload_table_action(e):
+        # TableManagerのデータを再読み込み
+        table_manager.data.clear()
+        table_manager.headers = ["回数"]
+        table_manager.load_table()
+
+        page.snack_bar = ft.SnackBar(
+            ft.Text("厳選表を再読み込みしました"),
+            bgcolor=ft.Colors.GREEN,
+        )
+        page.snack_bar.open = True
+        page.update()
+
+    selection_row = ft.Row(
+        [weapon_dropdown, element_dropdown],
+        spacing=10,
+    )
+
+    confirmed_count_row = ft.Row(
+        [confirmed_count_input],
         alignment=ft.MainAxisAlignment.CENTER,
     )
 
@@ -80,7 +157,6 @@ def create_app(page: ft.Page):
         ),
         text_align=ft.TextAlign.RIGHT,
         border_color=ft.Colors.GREY_500,
-        label_style=ft.TextStyle(color=ft.Colors.GREY_500),
     )
 
     return_title_checkbox = ft.Checkbox(
@@ -136,8 +212,42 @@ def create_app(page: ft.Page):
             shape=ft.RoundedRectangleBorder(radius=10),
         ),
         height=50,
-        width=200,
+        expand=True,
         disabled=False,
+    )
+
+    route_button = ft.ElevatedButton(
+        text="厳選ルート",
+        icon=ft.Icons.ROUTE,
+        style=ft.ButtonStyle(
+            shape=ft.RoundedRectangleBorder(radius=10),
+            padding=20,
+        ),
+        expand=True,
+        on_click=lambda _: page.go("/routes"),
+    )
+
+    def open_output_folder(e):
+        path = output_path.value
+        if path:
+            # 相対パスを絶対パスに変換
+            abs_path = Path(path).resolve()
+            if abs_path.exists():
+                os.startfile(str(abs_path))
+            else:
+                show_error("フォルダが見つかりません。")
+        else:
+            show_error("フォルダが指定されていません。")
+
+    open_folder_button = ft.ElevatedButton(
+        text="厳選表の場所",
+        icon=ft.Icons.FOLDER_OPEN,
+        style=ft.ButtonStyle(
+            shape=ft.RoundedRectangleBorder(radius=10),
+            padding=20,
+        ),
+        expand=True,
+        on_click=open_output_folder,
     )
 
     def show_error(message: str):
@@ -173,7 +283,20 @@ def create_app(page: ft.Page):
             config_data["reroll"]["stop_on_match"] = stop_match_checkbox.value
             config_data["reroll"]["return_to_title"] = return_title_checkbox.value
 
+            try:
+                confirmed_cnt = int(confirmed_count_input.value)
+            except ValueError:
+                confirmed_cnt = 0
+            config_data["reroll"]["current_confirmed_count"] = confirmed_cnt
+
             config_data["reroll"]["target_combinations"] = new_target_combinations
+
+            # 前回選択値を保存
+            if "selection" not in config_data:
+                config_data["selection"] = {}
+
+            config_data["selection"]["last_weapon"] = weapon_dropdown.value
+            config_data["selection"]["last_element"] = element_dropdown.value
 
             with open(config_path, "w", encoding="utf-8") as f:
                 toml.dump(config_data, f)
@@ -230,6 +353,13 @@ def create_app(page: ft.Page):
                     target_combination=target_combos,
                     stop_on_match=stop_match_checkbox.value,
                     return_to_title=return_title_checkbox.value,
+                    weapon_name=weapon_dropdown.value,  # 新規引数
+                    weapon_element=element_dropdown.value,  # 新規引数
+                    confirmed_count=(
+                        int(confirmed_count_input.value)
+                        if confirmed_count_input.value.isdigit()
+                        else 0
+                    ),  # 新規引数
                 )
                 game.run()
 
@@ -264,27 +394,8 @@ def create_app(page: ft.Page):
 
     # レイアウト構築
 
-    # 出力設定
-    path_section = ft.Container(
-        content=ft.Column(
-            [
-                ft.Text(
-                    "出力設定",
-                    size=14,
-                    weight=ft.FontWeight.BOLD,
-                    color=ft.Colors.PRIMARY,
-                ),
-                path_row,
-            ],
-            spacing=15,
-        ),
-        padding=15,
-        bgcolor=ft.Colors.GREY_900,
-        border_radius=10,
-    )
-
     # 実行オプション
-    options_section = ft.Container(
+    options_section_content = ft.Container(
         content=ft.Column(
             [
                 ft.Text(
@@ -293,29 +404,38 @@ def create_app(page: ft.Page):
                     weight=ft.FontWeight.BOLD,
                     color=ft.Colors.PRIMARY,
                 ),
+                path_row,  # 移動
+                ft.Divider(height=1),  # 追加
+                selection_row,
                 ft.Row([max_attempts_input], alignment=ft.MainAxisAlignment.START),
                 ft.Row(
                     [return_title_checkbox, stop_match_checkbox],
                     alignment=ft.MainAxisAlignment.START,
                     spacing=15,
                 ),
+                ft.Divider(height=1),  # 追加
+                confirmed_count_row,
+                ft.Text(  # 内容修正
+                    "セーブされており、確定している回数です。ロードし直してもこれ以上戻れないポイントとも言えます。厳選表を使用しない場合は変更の必要はありません。",
+                    size=12,
+                    color=ft.Colors.GREY_500,
+                ),
             ],
             spacing=15,
         ),
-        padding=15,
-        bgcolor=ft.Colors.GREY_900,
-        border_radius=10,
+        padding=20,
+    )
+
+    options_section = ft.Card(
+        content=options_section_content,
+        elevation=2,
     )
 
     # ターゲットスキル
     skill_controls = []
     for section in skill_sections:
         skill_controls.append(section)
-        skill_controls.append(ft.Divider(height=10, color=ft.Colors.GREY_700))
-
-    # 最後のDividerを削除
-    if skill_controls:
-        skill_controls.pop()
+        # Dividerは削除
 
     skills_card = ft.Card(
         content=ft.Container(
@@ -328,11 +448,10 @@ def create_app(page: ft.Page):
                         color=ft.Colors.PRIMARY,
                     ),
                     ft.Text(
-                        "※シリーズ・グループのいずれか片方のみも可",
+                        "シリーズとグループのいずれか片方のみも可",
                         size=12,
                         color=ft.Colors.GREY_500,
                     ),
-                    ft.Divider(),
                     *skill_controls,
                 ],
                 spacing=15,
@@ -348,21 +467,30 @@ def create_app(page: ft.Page):
             """
 ### 説明
 
-ワイルズの巨戟アーティア武器は、各武器の各属性ごとにスキルの組み合わせの出る順番が決まっていて、セーブ&ロードでやり直しても同じ結果になります。この仕様を利用し、自動で繰り返し再付与を行い何回目で欲しいスキルの組み合わせが出るのかを確認できるツールです。表と組み合わせて使うとより効率的です。 (ここでは表を使った厳選方法は説明しません。)
+ワイルズの巨戟アーティア武器は、各武器の各属性ごとにスキルの組み合わせの出る順番が決まっていて、セーブ&ロードでやり直しても同じ結果になります。この仕様を利用し、自動で繰り返し再付与を行い何回目で欲しいスキルの組み合わせが出るのかを確認できるツールです。表と組み合わせて使うとより効率的です。
 
-1. ゲーム画面をウィンドウモードかウィンドウフルスクリーンで起動してスキル再付与の画面を表示してください。
+1. ゲーム画面をウィンドウモードかウィンドウフルスクリーンモードで起動してスキル再付与の画面を表示してください。
 2. 各種設定を確認し実行してください。当てたいスキルの組み合わせは5つまで設定できます。
 3. 自動でスキル再付与を繰り返し、設定したスキルの組み合わせが出たら回数とスクリーンショットを保存します。
-4. 再付与が終わるとセーブせずにタイトルに戻ります。また厳選の履歴をまとめたレポートを保存します。
-5. お目当ての組み合わせが出ていた場合は、その回数まで再付与をもう一度行うことでその組み合わせを再現できます。お手元の厳選表に記録したり、改めて再付与して入手してください。
+4. 再付与が終わるとセーブせずにタイトルに戻ります。また厳選の履歴をまとめたレポートを保存と厳選表の更新を行います。
+5. お目当ての組み合わせが出ていた場合は、その回数まで再付与をもう一度行うことでその組み合わせを再現できます。
+
+#### 厳選表
+
+本ツールで厳選を実行すると`reroll_table.csv`というファイルが設定したフォルダーに自動で作成、更新されます。これは各武器各属性において「何回目にどのスキルの組み合わせが出たか」を記録した表、いわゆる厳選表です。ExcelやGoogle スプレッドシートなどで開けます。またこの表から導出した「何回目にどの武器にスキル付与すればよいか」を「厳選ルート」ボタンから確認できます。
+
+なお表の更新時には「確定済み回数」より後のデータのみを更新します。ゲーム内で厳選後セーブを行って結果を確定させた回数をここに入力してください。例えば、厳選を開始して10回目に狙いたいスキルが出てセーブした場合10と入力してください。
 
 ### 備考
 
+- **厳選中に他のウィンドウに切り替えないでください！**
+- スキル名の誤検出について、検出条件を緩めに設定しているので誤検出が発生します。緩めにしているのは、厳選作業では、もし検出漏れが起きた場合にダメージが大きすぎることと、誤検出を含めても当たりの絶対数が少なく目視での確認が容易だからです。多少誤検出が混じっても、確実に当たり組み合わせを見落とさないことを優先しています。
 - 途中で停止した場合もレポートは保存されます。
 - スキルの組み合わせはシリーズスキルかグループスキルのどちらか一方のみの設定でも問題ありません。
 - 所持している素材分で抽選できる回数以上を指定した場合は、所持している素材分抽選しきった段階で終了します。
 - 「当たりが出たら停止」をチェックしておけば、設定したスキルの組み合わせが出たらそこで停止します。スキルを実際に付与するかどうかの確認画面で終了します。
 - 「終了後セーブせずタイトルに戻る」のチェックを外すとタイトルに戻りません。
+- 武器種によっては状態異常属性と無属性のテーブルが同じ場合があるかもしれません。
 
 ### 本ツールを作った理由
 
@@ -380,13 +508,16 @@ def create_app(page: ft.Page):
     # ListViewを使用してスクロール機能とPaddingを両立
     list_view = ft.ListView(
         controls=[
-            path_section,
-            ft.Divider(height=10, color="transparent"),
             options_section,
             ft.Divider(height=20, color="transparent"),
             skills_card,
             ft.Divider(height=30, color="transparent"),
-            ft.Row([run_button], alignment=ft.MainAxisAlignment.CENTER),
+            ft.Row(
+                [open_folder_button, run_button, route_button],
+                alignment=ft.MainAxisAlignment.CENTER,
+                spacing=20,
+            ),
+            ft.Divider(height=30, color="transparent"),
             ft.Divider(height=30, color="transparent"),
             description_container,
             ft.Divider(height=50, color="transparent"),
@@ -403,13 +534,191 @@ def create_app(page: ft.Page):
         alignment=ft.alignment.top_center,
     )
 
-    page.add(
-        ft.Row(
-            [main_container],
-            alignment=ft.MainAxisAlignment.CENTER,
-            vertical_alignment=ft.CrossAxisAlignment.START,
-            expand=True,
-        )
-    )
-
     page.padding = 0
+
+    # --- Routes View ---
+    def routes_view():
+        # 現在の設定を取得
+        targets = []
+        for series_skill, group_skill in skill_sets:
+            if series_skill.value or group_skill.value:
+                s_val = series_skill.value if series_skill.value else ""
+                g_val = group_skill.value if group_skill.value else ""
+                targets.append([s_val, g_val])
+
+        # 確定済み回数
+        min_count = (
+            int(confirmed_count_input.value)
+            if confirmed_count_input.value and confirmed_count_input.value.isdigit()
+            else 0
+        )
+
+        # 検索実行
+        matches = table_manager.find_target_combinations(
+            targets, min_count, MATCH_THRESHOLD
+        )
+
+        # 説明欄
+        markdown_text = f"""
+### 説明
+
+あなたが設定した「狙いたいスキルの組み合わせ」が、厳選表の何回目に出現するかを調べた結果です。
+
+- 確定済み回数 (現在は{min_count}回) より後の回数のみが表示されます。
+- ターゲットはあなたが設定したスキルの組み合わせです。検出結果は厳選表の中でターゲットと一致したデータですが、一致条件が緩いため誤検出がしばしば混じります。例えば、「火竜の力」を「黒蝕竜の力」として検出してしまう場合があります。誤検出についてはメインページの備考をご確認ください。
+"""
+        routes_description_container = ft.Container(
+            content=ft.Markdown(
+                markdown_text,
+                selectable=True,
+                extension_set=ft.MarkdownExtensionSet.GITHUB_FLAVORED,
+                on_tap_link=lambda e: page.launch_url(e.data),
+            ),
+            padding=15,
+            border=ft.border.all(1, ft.Colors.GREY_700),
+            border_radius=10,
+            margin=ft.margin.only(bottom=20),
+        )
+
+        # 結果リスト構築
+        list_items = [routes_description_container]
+        if not matches:
+            list_items.append(
+                ft.Container(
+                    content=ft.Text(
+                        "条件に一致する厳選ルートは見つかりませんでした。",
+                        color=ft.Colors.GREY_500,
+                    ),
+                    alignment=ft.alignment.center,
+                    padding=20,
+                )
+            )
+        else:
+            for m in matches:
+                count = m["count"]
+                w_e = m["weapon_element"]
+                combo = m["matched_combo"]
+                detected = m.get("raw_skills", "")
+
+                # コンボ表示用
+                combo_str = " + ".join([c for c in combo if c])
+
+                card = ft.Card(
+                    content=ft.Container(
+                        content=ft.Column(
+                            [
+                                ft.Row(
+                                    [
+                                        ft.Text(
+                                            f"{count}回目",
+                                            size=20,
+                                            weight=ft.FontWeight.BOLD,
+                                            color=ft.Colors.AMBER,
+                                        ),
+                                        ft.Container(
+                                            content=ft.Text(
+                                                w_e,
+                                                size=14,
+                                                weight=ft.FontWeight.BOLD,
+                                                color=ft.Colors.ON_PRIMARY_CONTAINER,
+                                            ),
+                                            bgcolor=ft.Colors.PRIMARY_CONTAINER,
+                                            padding=ft.padding.symmetric(
+                                                horizontal=10, vertical=5
+                                            ),
+                                            border_radius=5,
+                                        ),
+                                    ],
+                                    alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                                ),
+                                ft.Divider(height=10, color="transparent"),
+                                ft.Text(
+                                    f"ターゲット: {combo_str}",
+                                    size=14,
+                                    weight=ft.FontWeight.BOLD,
+                                ),
+                                ft.Text(
+                                    f"検出結果: {detected}",
+                                    size=12,
+                                    color=ft.Colors.GREY_500,
+                                ),
+                            ]
+                        ),
+                        padding=15,
+                    ),
+                    margin=ft.margin.only(bottom=10),
+                )
+                list_items.append(card)
+
+        return ft.View(
+            "/routes",
+            [
+                ft.AppBar(
+                    title=ft.Text("最適な厳選ルート"),
+                    center_title=True,
+                    bgcolor="surfaceVariant",
+                    leading=ft.IconButton(
+                        ft.Icons.ARROW_BACK, on_click=lambda _: page.go("/")
+                    ),
+                ),
+                ft.Container(
+                    content=ft.Container(
+                        content=ft.ListView(
+                            controls=list_items,
+                            expand=True,
+                            padding=20,
+                        ),
+                        width=600,
+                        padding=20,
+                        alignment=ft.alignment.top_center,
+                    ),
+                    expand=True,
+                    alignment=ft.alignment.top_center,
+                ),
+            ],
+            padding=0,
+        )
+
+    # --- Routing ---
+    def route_change(route):
+        page.views.clear()
+
+        # Main View
+        page.views.append(
+            ft.View(
+                "/",
+                [
+                    ft.AppBar(
+                        title=ft.Text("巨戟アーティア武器スキル厳選自動化ツール"),
+                        center_title=True,
+                        bgcolor="surfaceVariant",
+                        actions=[
+                            ft.Container(
+                                content=reload_table_button,
+                                margin=ft.margin.only(right=10),
+                            )
+                        ],
+                    ),
+                    ft.Container(
+                        content=main_container,
+                        expand=True,
+                        alignment=ft.alignment.top_center,
+                    ),
+                ],
+                padding=0,
+            )
+        )
+
+        if page.route == "/routes":
+            page.views.append(routes_view())
+
+        page.update()
+
+    def view_pop(view):
+        page.views.pop()
+        top_view = page.views[-1]
+        page.go(top_view.route)
+
+    page.on_route_change = route_change
+    page.on_view_pop = view_pop
+    page.go(page.route)
