@@ -19,6 +19,7 @@ from .config import (
 from .ocr_handler import OCRHandler
 from .screen_reader import ScreenReader
 from .input_manager import InputManager
+from .table_manager import TableManager
 
 
 class GameLogic:
@@ -29,6 +30,9 @@ class GameLogic:
         target_combination: list = None,
         stop_on_match: bool = True,
         return_to_title: bool = True,
+        weapon_name: str = "Unknown",
+        weapon_element: str = "Unknown",
+        confirmed_count: int = 0,
     ):
         self.logger = logging.getLogger(__name__)
         if timestamp is None:
@@ -37,14 +41,23 @@ class GameLogic:
         self.session_dir.mkdir(parents=True, exist_ok=True)
         self.logger.info(f"Session directory created: {self.session_dir}")
 
-        # セッション開始時刻を保存（レポート用）
         self.session_timestamp = timestamp
 
         self.initial_materials = []
         self.history = []
+
+        # 今回の実行で取得したスキル結果を保持
+        self.current_session_results = []
+
         self.total_points_start = 0
-        self.weapon_name = "Unknown"
-        self.weapon_element = "Unknown"
+        if weapon_name is None:
+            weapon_name = "Unknown"
+        if weapon_element is None:
+            weapon_element = "Unknown"
+
+        self.weapon_name = weapon_name
+        self.weapon_element = weapon_element
+        self.confirmed_count = confirmed_count
 
         self.max_attempts = max_attempts
         self.current_attempt = 0
@@ -62,9 +75,10 @@ class GameLogic:
         self.ocr = OCRHandler()
         self.screen_reader = ScreenReader()
         self.input_manager = InputManager()
+        self.table_manager = TableManager()
 
         self.logger.info(
-            f"GameLogic initialized. Fallback max attempts: {max_attempts}, StopOnMatch: {stop_on_match}, Return: {return_to_title}"
+            f"GameLogic initialized. Weapon: {self.weapon_name} ({self.weapon_element}), ConfirmedCount: {self.confirmed_count}"
         )
 
     def run(self):
@@ -111,6 +125,10 @@ class GameLogic:
 
                 # スキル検出
                 skills = self._analyze_result()
+
+                skills_str_for_csv = "+".join(skills) if skills else ""
+                self.current_session_results.append(skills_str_for_csv)
+
                 self.logger.info(f"Detected skills: {skills}")
 
                 # ターゲット判定
@@ -128,7 +146,6 @@ class GameLogic:
                 if self.target_combinations:
                     if is_target:
                         self.logger.info("!!! TARGET COMBINATION FOUND !!!")
-                        # ターゲット検出時は接頭辞なしで保存
                         self._save_screenshot(skills, prefix="")
                         self.logger.info(f"Target found: {skills}.")
 
@@ -197,9 +214,6 @@ class GameLogic:
         self.logger.info("Calculating available attempts from materials...")
         full_img = self.screen_reader.capture_screen()
 
-        # Extract weapon info using the same screenshot
-        self._extract_weapon_info(full_img)
-
         total_points = 0
         self.initial_materials = []
 
@@ -255,67 +269,8 @@ class GameLogic:
                 "Could not calculate max attempts from screen. Check debug image."
             )
 
-    def _extract_weapon_info(self, full_img):
-        """Extract weapon name and element from the full screen image."""
-        try:
-            # Weapon Name
-            nx1, ny1, nx2, ny2 = COORDINATES["WEAPON_NAME"]
-            name_img = full_img[ny1:ny2, nx1:nx2]
-            name_texts = self.ocr.extract_text(name_img)
-            if name_texts:
-                self.weapon_name = name_texts[0].strip()
-
-            # Weapon Element
-            ex1, ey1, ex2, ey2 = COORDINATES["WEAPON_ELEMENT"]
-            elem_img = full_img[ey1:ey2, ex1:ex2]
-            elem_texts = self.ocr.extract_text(elem_img)
-
-            # OCRが何も検出しなかった、または空のリストの場合
-            if not elem_texts:
-                self.weapon_element = "無"
-            else:
-                raw_elem = elem_texts[0].strip()
-                # 属性タイプを除去
-                clean_elem = raw_elem.replace("属性タイプ", "").strip()
-
-                # 空文字列またはスペースのみの場合
-                if not clean_elem:
-                    self.weapon_element = "無"
-                else:
-                    # 有効な属性リスト
-                    valid_elements = [
-                        "火",
-                        "水",
-                        "雷",
-                        "氷",
-                        "龍",
-                        "麻痺",
-                        "毒",
-                        "爆破",
-                        "無",
-                    ]
-
-                    # マッチする属性を探す
-                    matched = None
-                    for elem in valid_elements:
-                        if elem in clean_elem:
-                            matched = elem
-                            break
-
-                    if matched:
-                        self.weapon_element = matched
-                    else:
-                        self.weapon_element = "正常に認識できませんでした"
-
-            self.logger.info(f"Weapon Info: {self.weapon_name} ({self.weapon_element})")
-
-        except Exception as e:
-            self.logger.error(f"Failed to extract weapon info: {e}")
-
     def _perform_reroll_action(self):
-        self.input_manager.click_auto_select()
-        self.input_manager.click_reroll()
-        self.input_manager.confirm_selection()
+        self.input_manager.execute_reroll_sequence()
 
     def _analyze_result(self) -> list[str]:
         cropped_img = self.screen_reader.get_skill_area_image()
@@ -389,6 +344,23 @@ class GameLogic:
 
     def _finalize(self):
         self.logger.info("Finishing process...")
+
+        if self.current_session_results:
+            self.logger.info(
+                f"Updating table with {len(self.current_session_results)} results..."
+            )
+            try:
+                self.table_manager.update_table(
+                    weapon=self.weapon_name,
+                    element=self.weapon_element,
+                    new_results=self.current_session_results,
+                    confirmed_count=self.confirmed_count,
+                )
+            except Exception as e:
+                self.logger.error(f"Failed to update table: {e}", exc_info=True)
+        else:
+            self.logger.warning("No results to update in table.")
+
         self._generate_report()
 
     def _generate_report(self):

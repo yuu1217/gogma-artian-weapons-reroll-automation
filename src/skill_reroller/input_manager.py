@@ -36,53 +36,40 @@ class InputManager:
         ctypes.windll.user32.SetForegroundWindow(hwnd)
         time.sleep(1.0)
 
-    def _press(self, key: str, delay: float = DELAYS["AFTER_CLICK"]):
+    def _press(self, key: str, delay: float = 0.0):
         try:
             self.logger.debug(f"Pressing key: {key}")
             pydirectinput.press(key)
-            time.sleep(delay)
+            if delay > 0:
+                time.sleep(delay)
         except Exception as e:
             self.logger.error(f"Key press failed: {e}")
 
-    # 自動選択
-    def click_auto_select(self):
-        self.logger.info("Actions: Auto Select (G)")
-        self._press(KEYBINDS["AUTO_SELECT"])
-
-    # 再付与実行
-    def click_reroll(self):
-        self.logger.info("Actions: Reroll (Space)")
+    def execute_reroll_sequence(self):
+        self.logger.info("Executing reroll sequence (G -> Space -> Space)...")
+        self._press(KEYBINDS["AUTO_SELECT"], delay=DELAYS["AFTER_CLICK"])
+        self._press(KEYBINDS["CONFIRM"], delay=DELAYS["AFTER_CLICK"])
         self._press(KEYBINDS["CONFIRM"])
+        self.logger.info("Reroll sequence initiated.")
 
-    # タイトルに戻るシーケンス
     def return_to_title(self):
         self.logger.info("Executing return to title sequence...")
-        # メニューを開く
         for _ in range(5):
             self._press(KEYBINDS["MENU"], delay=DELAYS["RETURN_TO_TITLE"])
 
-        # タブ切り替え
         self._press(KEYBINDS["TAB_LEFT"], delay=DELAYS["RETURN_TO_TITLE"])
 
-        # タイトルに戻るを選択
         for _ in range(2):
-            self._press(KEYBINDS["UP"])
+            self._press(KEYBINDS["UP"], delay=DELAYS["AFTER_CLICK"])
 
-        self._press(KEYBINDS["CONFIRM"])
+        self._press(KEYBINDS["CONFIRM"], delay=DELAYS["AFTER_CLICK"])
+        self._press(KEYBINDS["DOWN"], delay=DELAYS["AFTER_CLICK"])
 
-        self._press(KEYBINDS["DOWN"])
-
-        # 決定して遷移待ち
         for _ in range(2):
             self._press(KEYBINDS["CONFIRM"], delay=DELAYS["RETURN_TO_TITLE"])
 
         self.logger.info("Return to title sequence finished.")
 
-    def confirm_selection(self):
-        self.logger.info("Actions: Confirm (Space)")
-        self._press(KEYBINDS["CONFIRM"])
-
-    # いいえを選んで進む
     def select_no_and_confirm(self):
         self.logger.info("Actions: Select No (Up -> Space)")
         self._press(KEYBINDS["UP"])

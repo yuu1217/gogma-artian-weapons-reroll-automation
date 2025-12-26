@@ -34,7 +34,7 @@ class OCRHandler:
             # 辞書形式のレスポンス (新しいPaddleOCR)
             if isinstance(page_result, dict):
                 if "rec_texts" in page_result:
-                    return page_result["rec_texts"]
+                    return [text.strip() for text in page_result["rec_texts"]]
 
             # リスト形式のレスポンス
             if isinstance(page_result, list):
@@ -42,7 +42,7 @@ class OCRHandler:
                     if len(line) >= 2 and isinstance(line[1], (list, tuple)):
                         text_info = line[1]
                         if len(text_info) > 0:
-                            text = text_info[0]
+                            text = text_info[0].strip()
                             extracted_texts.append(text)
 
             return extracted_texts
