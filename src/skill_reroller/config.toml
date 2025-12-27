@@ -5,13 +5,13 @@ window_title = "Monster Hunter Wilds"
 lang = "japan"
 
 [coordinates]
-auto_select_btn = [ 248, 1417,]
-reroll_btn = [ 460, 773,]
-skill_area = [ 2150, 710, 2560, 800,]
-back_btn = [ 40, 1419,]
-material_rows = [ [ 680, 340, 920, 390,], [ 680, 460, 920, 510,], [ 680, 580, 920, 630,],]
-weapon_name = [ 1620, 252, 2020, 303,]
-weapon_element = [ 1790, 560, 2030, 600,]
+auto_select_btn = [ 0.09688, 0.98403,]
+reroll_btn = [ 0.17969, 0.53681,]
+skill_area = [ 0.83984, 0.49306, 1.0, 0.55556,]
+back_btn = [ 0.01562, 0.98542,]
+material_rows = [ [ 0.26562, 0.23611, 0.35938, 0.27083,], [ 0.26562, 0.31944, 0.35938, 0.35417,], [ 0.26562, 0.40278, 0.35938, 0.4375,],]
+weapon_name = [ 0.63281, 0.175, 0.78906, 0.21042,]
+weapon_element = [ 0.69922, 0.38889, 0.79297, 0.41667,]
 
 [keybinds]
 auto_select_key = "g"
