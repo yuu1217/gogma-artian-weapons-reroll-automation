@@ -220,8 +220,7 @@ class GameLogic:
         self.initial_materials = []
 
         for i, area in enumerate(COORDINATES["MATERIAL_ROWS"]):
-            left, top, right, bottom = area
-            cropped = full_img[top:bottom, left:right]
+            cropped = self.screen_reader.crop_from_rect(full_img, area)
             texts = self.ocr.extract_text(cropped)
             self.logger.info(f"Row {i+1} texts: {texts}")
 
