@@ -84,6 +84,7 @@ def copy_project_files():
     files_to_copy = [
         "pyproject.toml",
         "README.md",
+        "LICENSE",
         "main.py",
         "config.toml",  # Assuming config.toml is in root or src, user path indicated src/skill_reroller/config.toml but implementation plan said root?
         # Let's check where config.toml is. It is in src/skill_reroller/config.toml in the active document metadata.
