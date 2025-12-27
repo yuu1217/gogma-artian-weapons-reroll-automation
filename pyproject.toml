@@ -3,7 +3,11 @@ name = "gogma-artian-weapons-reroll-automation"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
+license = "GPL-3.0-or-later"
 requires-python = ">=3.13"
+classifiers = [
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+]
 dependencies = [
     "flet[all]==0.28.3",
     "keyboard==0.13.5",
