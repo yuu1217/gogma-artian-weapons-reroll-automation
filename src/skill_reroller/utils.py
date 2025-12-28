@@ -22,3 +22,10 @@ def is_fuzzy_match(target: str, skill: str, threshold: float) -> bool:
         if ratio >= threshold:
             return True
     return False
+
+
+def calculate_similarity(text1: str, text2: str) -> float:
+    """
+    2つの文字列の類似度を計算する (0.0 - 1.0)
+    """
+    return SequenceMatcher(None, text1, text2).ratio()

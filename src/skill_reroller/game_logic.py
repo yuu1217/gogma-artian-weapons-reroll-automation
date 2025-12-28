@@ -15,11 +15,17 @@ from .config import (
     MAX_ATTEMPTS,
     STOP_KEY,
     REPORT_NAME,
+    SERIES_SKILLS,
+    GROUP_SKILLS,
 )
 from .ocr_handler import OCRHandler
 from .screen_reader import ScreenReader
 from .input_manager import InputManager
 from .table_manager import TableManager
+from .utils import calculate_similarity
+
+# 全スキルリストを作成
+ALL_SKILLS = SERIES_SKILLS + GROUP_SKILLS
 
 
 class GameLogic:
@@ -295,6 +301,31 @@ class GameLogic:
 
                 for detected in detected_skills:
                     if self._is_fuzzy_match(target_skill, detected):
+                        # 追加検証: この検出された文字列は本当にターゲットスキルか？
+                        # 全スキルリストの中で、ターゲットスキルよりも高い類似度を持つスキルがあるか確認する
+                        score_target = calculate_similarity(detected, target_skill)
+
+                        best_match_other_score = 0.0
+                        best_match_other_skill = ""
+
+                        for skill in ALL_SKILLS:
+                            if skill == target_skill:
+                                continue
+
+                            score = calculate_similarity(detected, skill)
+                            if score > best_match_other_score:
+                                best_match_other_score = score
+                                best_match_other_skill = skill
+
+                        # 他のスキルの方が明らかに近い場合は誤検出として扱う
+                        # ただし同率の場合はターゲットの可能性を残す
+                        if best_match_other_score > score_target:
+                            self.logger.info(
+                                f"Filtered out false positive: '{detected}' matched '{target_skill}' ({score_target:.2f}) "
+                                f"but matches '{best_match_other_skill}' ({best_match_other_score:.2f}) better."
+                            )
+                            continue
+
                         found_this_skill = True
                         if target_skill in detected:
                             found_exact_skill = True
