@@ -442,7 +442,7 @@ def create_app(page: ft.Page):
             content=ft.Column(
                 [
                     ft.Text(
-                        "狙いたいスキルの組み合わせ",
+                        "付与したいスキルの組み合わせ",
                         size=16,
                         weight=ft.FontWeight.BOLD,
                         color=ft.Colors.PRIMARY,
@@ -484,7 +484,6 @@ def create_app(page: ft.Page):
 ### 備考
 
 - **厳選中に他のウィンドウに切り替えないでください！**
-- スキル名の誤検出について、検出条件を緩めに設定しているので誤検出が発生します。緩めにしているのは、厳選作業では、もし検出漏れが起きた場合にダメージが大きすぎることと、誤検出を含めても当たりの絶対数が少なく目視での確認が容易だからです。多少誤検出が混じっても、確実に当たり組み合わせを見落とさないことを優先しています。
 - 途中で停止した場合もレポートは保存されます。
 - スキルの組み合わせはシリーズスキルかグループスキルのどちらか一方のみの設定でも問題ありません。
 - 所持している素材分で抽選できる回数以上を指定した場合は、所持している素材分抽選しきった段階で終了します。
@@ -565,7 +564,7 @@ def create_app(page: ft.Page):
 あなたが設定したスキルの組み合わせが、厳選表の何回目に出現するかを調べた結果です。**何回目にどの武器でスキル再付与を行えばよいか**がわかります。
 
 - 確定済み回数 (現在は{min_count}回) より後の回数のみが表示されます。
-- 「ターゲット」はあなたが設定したスキルの組み合わせです。「厳選表の内容」は厳選表の中でターゲットと一致すると判断されたデータですが、一致条件が緩いため誤検出がしばしば混じります。例えば、「黒蝕竜の力」をターゲットにした時「火竜の力」も検出してしまう場合があります。誤検出についてはメインページの備考をご確認ください。
+- 「付与したいスキルの組み合わせ」はあなたが設定したスキルの組み合わせです。
 """
         routes_description_container = ft.Container(
             content=ft.Markdown(
@@ -614,16 +613,6 @@ def create_app(page: ft.Page):
                     ),
                 ]
 
-                if not is_exact_match:
-                    title_row_controls.append(
-                        ft.Text(
-                            "誤検出の可能性あり",
-                            size=12,
-                            color=ft.Colors.RED_400,
-                            weight=ft.FontWeight.BOLD,
-                        )
-                    )
-
                 # カードコンテンツ
                 card_controls = [
                     ft.Row(
@@ -649,16 +638,26 @@ def create_app(page: ft.Page):
                     ),
                     ft.Divider(height=10, color="transparent"),
                     ft.Text(
-                        f"ターゲット: {combo_str}",
+                        f"付与したいスキルの組み合わせ: {combo_str}",
                         size=14,
                         weight=ft.FontWeight.BOLD,
                     ),
                     ft.Text(
-                        f"厳選表の内容: {detected}",
+                        f"ゲーム画面のOCR結果: {detected}",
                         size=12,
                         color=ft.Colors.GREY_500,
                     ),
                 ]
+
+                if not is_exact_match:
+                    card_controls.append(
+                        ft.Text(
+                            "OCR結果が微妙に誤っているようです。念のため、「ゲーム画面のOCR結果」を確認して他のスキルの可能性がないか確認してください。",
+                            size=11,
+                            color=ft.Colors.RED_400,
+                            weight=ft.FontWeight.BOLD,
+                        )
+                    )
 
                 card = ft.Card(
                     content=ft.Container(
