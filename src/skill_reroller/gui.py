@@ -579,8 +579,78 @@ def create_app(page: ft.Page):
             margin=ft.margin.only(bottom=20),
         )
 
+        # 武器_属性ごとのスキル組み合わせ出現回数を集計
+        from collections import defaultdict
+
+        combo_stats = defaultdict(lambda: defaultdict(int))
+
+        for m in matches:
+            weapon_element = m["weapon_element"]
+            combo = m["matched_combo"]
+            combo_str = " + ".join([c for c in combo if c])
+            combo_stats[weapon_element][combo_str] += 1
+
+        # 集計結果を表示
+        stats_items = []
+        if combo_stats:
+            stats_items.append(
+                ft.Container(
+                    content=ft.Text(
+                        "各武器のスキル組み合わせ出現回数",
+                        size=18,
+                        weight=ft.FontWeight.BOLD,
+                        color=ft.Colors.PRIMARY,
+                    ),
+                    padding=ft.padding.only(bottom=10),
+                )
+            )
+
+            # 表の列順に従って表示
+            ordered_weapon_elements = [
+                h for h in table_manager.headers if h != "回数" and h in combo_stats
+            ]
+
+            for weapon_element in ordered_weapon_elements:
+                combos = combo_stats[weapon_element]
+                combo_lines = []
+                for combo_str, count in sorted(combos.items(), key=lambda x: -x[1]):
+                    combo_lines.append(
+                        ft.Row(
+                            [
+                                ft.Text("•", size=14, color=ft.Colors.AMBER),
+                                ft.Text(
+                                    f"{combo_str}: {count}回",
+                                    size=14,
+                                ),
+                            ],
+                            spacing=5,
+                        )
+                    )
+
+                stats_items.append(
+                    ft.Card(
+                        content=ft.Container(
+                            content=ft.Column(
+                                [
+                                    ft.Text(
+                                        weapon_element,
+                                        size=16,
+                                        weight=ft.FontWeight.BOLD,
+                                    ),
+                                    ft.Divider(height=5, color="transparent"),
+                                    *combo_lines,
+                                ]
+                            ),
+                            padding=15,
+                        ),
+                        margin=ft.margin.only(bottom=10),
+                    )
+                )
+
+            stats_items.append(ft.Divider(height=20, color=ft.Colors.GREY_700))
+
         # 結果リスト構築
-        list_items = [routes_description_container]
+        list_items = [routes_description_container] + stats_items
         if not matches:
             list_items.append(
                 ft.Container(
