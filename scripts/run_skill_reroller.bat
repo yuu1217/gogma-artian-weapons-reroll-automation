@@ -1,5 +1,3 @@
 @echo off
 cd /d "%~dp0\.."
-echo Starting GUI...
-uv run python main.py
-echo GUI closed.
+uv run main.py
