@@ -86,7 +86,7 @@ def copy_project_files():
         "README.md",
         "LICENSE",
         "main.py",
-        "config.toml",  # Assuming config.toml is in root or src, user path indicated src/skill_reroller/config.toml but implementation plan said root?
+        "uv.lock",
         # Let's check where config.toml is. It is in src/skill_reroller/config.toml in the active document metadata.
         # But usually there might be a root one? Let's assume we copy what's needed.
         # If config.toml is NOT in root, we don't copy it to root unless the app expects it there.
@@ -125,8 +125,7 @@ def create_run_bat():
     bat_content = (
         "@echo off\n"
         'cd /d "%~dp0\\.."\n'
-        '"%~dp0\\..\\uv\\uv.exe" run main.py\n'
-        "if %errorlevel% neq 0 pause\n"
+        '"%~dp0\\..\\uv\\uv.exe" run --locked main.py\n'
     )
 
     with open(scripts_dir / "run_skill_reroller.bat", "w") as f:
